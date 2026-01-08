@@ -4,25 +4,26 @@ let effects = [];
 let effectIndex = 0;
 let memo = [];
 let memoIndex = 0;
-let reducerStore = 0;
+let reducerStore = [];
 let reducerIndex = 0;
 
 export function useState(initialValue) {
   const currentIndex = stateIndex;
-  if (stateStore[stateIndex] === undefined) {
-    stateStore[stateIndex] = initialValue;
+  if (stateStore[currentIndex] === undefined) {
+    stateStore[currentIndex] = initialValue;
   }
 
   function getValue() {
-    return stateStore[stateIndex];
+    return stateStore[currentIndex];
   }
 
   function setValue(newState) {
-    stateStore[stateIndex] = newState;
+    stateStore[currentIndex] = newState;
+    render();
   }
   stateIndex++;
 
-  return [getValue, setValue];
+  return [stateStore[currentIndex], setValue];
 }
 
 export function resetState() {
@@ -31,27 +32,28 @@ export function resetState() {
 
 export function useEffect(callback, dependencies) {
   const currentIndex = effectIndex;
-
-  const hasNoDeps = !dependencies;
-  const hasEmptyDeps = dependencies && dependencies.length === 0;
-
   const prev = effects[currentIndex];
+
   let hasChanged = true;
 
   if (prev && dependencies) {
-    hasChanged = dependencies.some((dep, i) => dep !== prev.dependencies[i]);
+    hasChanged =
+      dependencies.length !== prev.dependencies.length ||
+      dependencies.some((dep, i) => dep !== prev.dependencies[i]);
   }
 
-  if (!prev) {
-    effects[currentIndex] = { dependencies };
-    callback();
-  } else if (hasNoDeps) {
-    callback();
-  } else if (hasEmptyDeps) {
-    // run only once →
-  } else if (hasChanged) {
-    callback();
-    effects[currentIndex].dependencies = dependencies;
+  const shouldRun =  !prev || !dependencies || hasChanged;
+  if (shouldRun) {
+    if (prev && typeof prev.cleanup === "function") {
+      prev.cleanup();
+    }
+
+    const cleanup = callback();
+
+    effects[currentIndex] = {
+      dependencies,
+      cleanup,
+    };
   }
 
   effectIndex++;
@@ -74,7 +76,7 @@ export function useMemo(callback, dependencies) {
   if (!prev || !dependencies || hasChanged) {
     const result = callback();
     memo[currentIndex] = { result, dependencies };
-    memoIndex++;          
+    memoIndex++;
     return result;
   }
 
@@ -98,9 +100,23 @@ export function useReducer(reducer, intialState) {
   }
 
   reducerIndex++;
-  return [state, dispatch];
+  return [reducerStore[currentIndex], dispatch];
 }
 
 export function resetReducer() {
   reducerIndex = 0;
+}
+
+export function useDebounce(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  // if(debouncedValue.trim()==="") return;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+
+  return debouncedValue;
 }
