@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+  <body style="margin: 0; overflow: hidden">
+    <canvas id="c"></canvas>
+    <script>
+      const c = document.getElementById("c");
+      const ctx = c.getContext("2d");
+
+      function resize() {
+        c.width = innerWidth;
+        c.height = innerHeight;
+      }
+      resize();
+      window.addEventListener("resize", resize);
+      const MAX = 500;
+
+      const x = new Float32Array(MAX);
+      const y = new Float32Array(MAX);
+      const vx = new Float32Array(MAX);
+      const vy = new Float32Array(MAX);
+      const r = new Float32Array(MAX);
+      // const gravity = 1;
+
+      const cellSize = 50;
+      const cols = Math.ceil(c.width / cellSize);
+      const rows = Math.ceil(c.height / cellSize);
+      const grid = Array(cols * rows);
+
+      // partical creation
+      for (let i = 0; i < MAX; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 1 + 1;
+
+        x[i] = Math.random() * c.width;
+        y[i] = Math.random() * c.height;
+        vx[i] = Math.cos(angle) * speed;
+        vy[i] = Math.sin(angle) * speed;
+        r[i] = Math.random() * 6 + 2;
+      }
+
+      let lastTime = performance.now();
+      let fps = 0;
+      function mesureFps(now) {
+        fps = Math.round(1000 / (now - lastTime));
+        lastTime = now;
+      }
+
+      function animate(now) {
+        mesureFps(now);
+        ctx.fillStyle = "rgba(0,0,0,0.3)";
+        ctx.fillRect(0, 0, c.width, c.height);
+
+        for (let i = 0; i < rows * cols; i++) {
+          grid[i] = [];
+        }
+
+        for (let i = 0; i < MAX; i++) {
+          x[i] += vx[i];
+          // vy[i] = gravity;
+          y[i] += vy[i];
+
+          if (x[i] < r[i] || x[i] > c.width - r[i]) vx[i] *= -1;
+          if (y[i] < r[i] || y[i] > c.height - r[i]) vy[i] *= -1;
+
+          const cx = (x[i] / cellSize) | 0;
+          const cy = (y[i] / cellSize) | 0;
+          // if (y[i] + r[i] >= c.height) {
+          //   y[i] = c.height - r[i];
+          //   vy[i] *= -0.8; // bounce strength
+          // } else {
+          //   vy[i] += gravity;
+          // }
+
+          if (cx >= 0 && cy >= 0 && cx < cols && cy < rows) {
+            grid[cx + cy * cols].push(i);
+          }
+        }
+
+        for (let i = 0; i < MAX; i++) {
+          const cx = (x[i] / cellSize) | 0;
+          const cy = (y[i] / cellSize) | 0;
+
+          for (let oy = -1; oy <= 1; oy++) {
+            for (let ox = -1; ox <= 1; ox++) {
+              const nx = cx + ox;
+              const ny = cy + oy;
+
+              if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+
+              const cell = grid[nx + ny * cols];
+
+              for (let k = 0; k < cell.length; k++) {
+                const j = cell[k];
+                if (j <= i) continue;
+
+                const dx = x[j] - x[i];
+                const dy = y[j] - y[i];
+                const rr = r[i] + r[j];
+
+                if (dx * dx + dy * dy < rr * rr) {
+                  const dist = Math.hypot(dx, dy) || 1;
+                  const overlap = (rr - dist) * 0.5;
+                  const nx = dx / dist;
+                  const ny = dy / dist;
+
+                  x[i] -= nx * overlap;
+                  y[i] -= ny * overlap;
+                  x[j] += nx * overlap;
+                  y[j] += ny * overlap;
+                }
+              }
+            }
+          }
+        }
+
+        ctx.fillStyle = "cyan";
+        ctx.beginPath();
+        for (let i = 0; i < MAX; i++) {
+          ctx.moveTo(x[i] + r[i], y[i]);
+          ctx.arc(x[i], y[i], r[i], 0, Math.PI * 2);
+        }
+        ctx.fill();
+
+        ctx.fillStyle = "lime";
+        ctx.font = "16px monospace";
+        ctx.fillText(`FPS: ${fps}`, 10, 20);
+
+        requestAnimationFrame(animate);
+      }
+      requestAnimationFrame(animate);
+    </script>
+  </body>
+</html>
